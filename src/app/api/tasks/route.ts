@@ -3,7 +3,13 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
+    // Get userId from searchParams to filter tasks
+    const searchParams = request.nextUrl.searchParams;
+    const userId = searchParams.get('userId');
+    
+    // Only return tasks for the specified user
     const tasks = await prisma.task.findMany({
+      where: userId ? { userId: userId } : undefined,
       include: {
         category: true,
       },
@@ -25,6 +31,14 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+    
+    // Ensure the task has a userId
+    if (!data.userId) {
+      return NextResponse.json(
+        { error: "User ID is required to create a task" },
+        { status: 400 }
+      );
+    }
 
     const task = await prisma.task.create({
       data,

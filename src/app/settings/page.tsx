@@ -11,6 +11,7 @@ export default function SettingsPage() {
   const user = useStore((state) => state.user);
   const setUser = useStore((state) => state.setUser);
   const setIsAuthenticated = useStore((state) => state.setIsAuthenticated);
+  const clearUserData = useStore((state) => state.clearUserData);
   const { theme, setTheme } = useTheme();
   
   const [name, setName] = useState("");
@@ -31,9 +32,11 @@ export default function SettingsPage() {
   const handleProfileUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) return;
+    
     if (name && email) {
       const updatedUser = {
-        ...user!,
+        ...user,
         name,
         email
       };
@@ -44,30 +47,60 @@ export default function SettingsPage() {
       // Update in localStorage
       try {
         localStorage.setItem("perfectday-user", JSON.stringify(updatedUser));
+        
+        // Update in users array
+        const existingUsers = JSON.parse(localStorage.getItem("perfectday-users") || "[]");
+        const updatedUsers = existingUsers.map((u: any) => 
+          u.id === user.id ? { ...u, name, email } : u
+        );
+        localStorage.setItem("perfectday-users", JSON.stringify(updatedUsers));
+        
+        alert("Profile updated successfully");
       } catch (error) {
         console.error("Error saving user data:", error);
+        alert("Error updating profile. Please try again.");
       }
-      
-      alert("Profile updated successfully");
     }
   };
   
   // Handle logout
   const handleLogout = () => {
-    // Clear auth state
-    setUser(null);
-    setIsAuthenticated(false);
-    
-    // Clear localStorage
     try {
+      // Save latest user data before logout
+      if (user) {
+        saveUserData(user.id);
+      }
+      
+      // Clear auth state
+      setUser(null);
+      setIsAuthenticated(false);
+      clearUserData();
+      
+      // Clear session localStorage (but keep users and other data)
       localStorage.removeItem("perfectday-auth");
       localStorage.removeItem("perfectday-user");
+      
+      // Redirect to login
+      router.push("/login");
     } catch (error) {
       console.error("Error during logout:", error);
+      alert("Error during logout. Please try again.");
     }
-    
-    // Redirect to login
-    router.push("/login");
+  };
+  
+  // Save user data to localStorage
+  const saveUserData = (userId: string) => {
+    try {
+      const tasks = useStore.getState().tasks;
+      const categories = useStore.getState().categories;
+      const moods = useStore.getState().moods;
+      
+      localStorage.setItem(`perfectday-tasks-${userId}`, JSON.stringify(tasks));
+      localStorage.setItem(`perfectday-categories-${userId}`, JSON.stringify(categories));
+      localStorage.setItem(`perfectday-moods-${userId}`, JSON.stringify(moods));
+    } catch (error) {
+      console.error("Error saving user data:", error);
+    }
   };
   
   // Handle data reset
@@ -77,27 +110,22 @@ export default function SettingsPage() {
       return;
     }
     
-    // Clear all app data
+    if (!user) return;
+    
+    // Clear user-specific data
     try {
-      localStorage.removeItem("perfectday-tasks");
-      localStorage.removeItem("perfectday-completed-tasks");
-      localStorage.removeItem("perfectday-routines");
-      localStorage.removeItem("perfectday-journal");
-      localStorage.removeItem("perfectday-storage"); // Zustand persisted state
+      // Clear from store
+      clearUserData();
       
-      // Keep user logged in
-      const userData = localStorage.getItem("perfectday-user");
-      const authStatus = localStorage.getItem("perfectday-auth");
+      // Clear from localStorage
+      localStorage.removeItem(`perfectday-tasks-${user.id}`);
+      localStorage.removeItem(`perfectday-categories-${user.id}`);
+      localStorage.removeItem(`perfectday-moods-${user.id}`);
+      localStorage.removeItem(`perfectday-routines-${user.id}`);
+      localStorage.removeItem(`perfectday-journal-${user.id}`);
       
-      // Clear localStorage completely
-      localStorage.clear();
-      
-      // Restore auth
-      if (userData) localStorage.setItem("perfectday-user", userData);
-      if (authStatus) localStorage.setItem("perfectday-auth", authStatus);
-      
-      alert("All app data has been reset. The app will reload.");
-      window.location.href = "/"; // Hard reload to reset all state
+      setClearDataConfirm(false);
+      alert("All your data has been reset successfully");
     } catch (error) {
       console.error("Error clearing data:", error);
       alert("Error clearing data. Please try again.");
@@ -263,7 +291,7 @@ export default function SettingsPage() {
           
           <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             <p>Perfect Day v1.0.0</p>
-            <p className="mt-2">A revolutionary app to track your day, manage tasks, and build routines for a perfect day, every day.</p>
+            <p className="mt-2">Track your day, manage tasks, and build routines for a perfect day, every day.</p>
           </div>
         </div>
       </div>

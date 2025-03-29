@@ -18,7 +18,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [isLoading, setIsLoading] = useState(true);
   const setUser = useStore((state) => state.setUser);
   const setIsAuthenticated = useStore((state) => state.setIsAuthenticated);
+  const setTasks = useStore((state) => state.setTasks);
+  const setCategories = useStore((state) => state.setCategories);
+  const setMoods = useStore((state) => state.setMoods);
   const isAuthenticated = useStore((state) => state.isAuthenticated);
+  const user = useStore((state) => state.user);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -27,13 +31,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     const checkAuth = () => {
       try {
+        console.log("AuthProvider initialized, checking for existing user...");
         const authStatus = localStorage.getItem("perfectday-auth");
         const userData = localStorage.getItem("perfectday-user");
         
         if (authStatus === "true" && userData) {
           // User is authenticated
-          setUser(JSON.parse(userData));
+          const parsedUser = JSON.parse(userData);
+          console.log("Found stored user:", parsedUser);
+          setUser(parsedUser);
           setIsAuthenticated(true);
+          
+          // Load user-specific data
+          loadUserData(parsedUser.id);
         } else {
           // User is not authenticated
           setUser(null);
@@ -53,13 +63,112 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       }
     };
     
+    // Load user-specific data from localStorage
+    const loadUserData = (userId: string) => {
+      try {
+        // Load tasks from API
+        fetch(`/api/tasks?userId=${userId}`)
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to fetch tasks');
+            }
+            return response.json();
+          })
+          .then(tasks => {
+            // Parse dates
+            const tasksWithParsedDates = tasks.map((task: any) => ({
+              ...task,
+              dueDate: task.dueDate ? new Date(task.dueDate) : null,
+              createdAt: task.createdAt ? new Date(task.createdAt) : new Date(),
+              updatedAt: task.updatedAt ? new Date(task.updatedAt) : new Date(),
+            }));
+            setTasks(tasksWithParsedDates);
+          })
+          .catch(error => {
+            console.error("Error loading tasks from API:", error);
+            
+            // Fall back to localStorage if API fails
+            const tasksData = localStorage.getItem(`perfectday-tasks-${userId}`);
+            if (tasksData) {
+              const parsedTasks = JSON.parse(tasksData, (key, value) => {
+                if (key === "dueDate" && value) {
+                  return new Date(value);
+                }
+                if (key === "createdAt" || key === "updatedAt") {
+                  return new Date(value);
+                }
+                return value;
+              });
+              setTasks(parsedTasks);
+            } else {
+              setTasks([]);
+            }
+          });
+        
+        // Load categories
+        const categoriesData = localStorage.getItem(`perfectday-categories-${userId}`);
+        if (categoriesData) {
+          const parsedCategories = JSON.parse(categoriesData, (key, value) => {
+            if (key === "createdAt" || key === "updatedAt") {
+              return new Date(value);
+            }
+            return value;
+          });
+          setCategories(parsedCategories);
+        }
+        
+        // Load moods
+        const moodsData = localStorage.getItem(`perfectday-moods-${userId}`);
+        if (moodsData) {
+          const parsedMoods = JSON.parse(moodsData, (key, value) => {
+            if (key === "createdAt") {
+              return new Date(value);
+            }
+            return value;
+          });
+          setMoods(parsedMoods);
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      }
+    };
+    
     // Only run on client
     if (typeof window !== "undefined") {
       checkAuth();
     } else {
       setIsLoading(false);
     }
-  }, [setUser, setIsAuthenticated, router, pathname]);
+  }, [setUser, setIsAuthenticated, setTasks, setCategories, setMoods, router, pathname]);
+
+  // Save user data when it changes
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // We'll use a debounce for this in a real app
+      return () => {
+        // This cleanup function will run when component unmounts or before effect re-runs
+        // Perfect time to save data
+        saveUserData(user.id);
+      };
+    }
+  }, [isAuthenticated, user]);
+  
+  // Function to save user data to localStorage
+  const saveUserData = (userId: string) => {
+    try {
+      // Get latest data from store
+      const tasks = useStore.getState().tasks;
+      const categories = useStore.getState().categories;
+      const moods = useStore.getState().moods;
+      
+      // Save to localStorage
+      localStorage.setItem(`perfectday-tasks-${userId}`, JSON.stringify(tasks));
+      localStorage.setItem(`perfectday-categories-${userId}`, JSON.stringify(categories));
+      localStorage.setItem(`perfectday-moods-${userId}`, JSON.stringify(moods));
+    } catch (error) {
+      console.error("Error saving user data:", error);
+    }
+  };
 
   // Redirect logic
   useEffect(() => {

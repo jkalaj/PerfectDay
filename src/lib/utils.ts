@@ -17,7 +17,10 @@ export function formatTime(date: Date | string, formatString: string = 'h:mm a')
   return format(dateToFormat, formatString);
 }
 
-export function getGroupedTasks(tasks: Task[], view: 'today' | 'week' | 'month') {
+export function getGroupedTasks(tasks: Task[], view: 'all' | 'today' | 'week' | 'month') {
+  // For the "all" view, return all tasks
+  if (view === 'all') return tasks;
+  
   return tasks.filter(task => {
     if (!task.dueDate) return view === 'today'; // Tasks without due date go to Today
     

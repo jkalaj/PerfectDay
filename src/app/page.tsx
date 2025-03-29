@@ -94,84 +94,61 @@ const demoMoods: Mood[] = [
 ];
 
 export default function Dashboard() {
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [categories, setCategories] = useState<Category[]>(demoCategories);
-  const [moods, setMoods] = useState<Mood[]>(demoMoods);
+  const user = useStore((state) => state.user);
+  const tasks = useStore((state) => state.tasks);
+  const setTasks = useStore((state) => state.setTasks);
+  const addTask = useStore((state) => state.addTask);
+  const updateTask = useStore((state) => state.updateTask);
+  const deleteTask = useStore((state) => state.deleteTask);
+  
+  const categories = useStore((state) => state.categories);
+  const setCategories = useStore((state) => state.setCategories);
+  
+  const moods = useStore((state) => state.moods);
+  const addMood = useStore((state) => state.addMood);
+  const setMoods = useStore((state) => state.setMoods);
+  
+  const activeView = useStore((state) => state.activeView);
+  
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  const activeView = useStore((state) => state.activeView);
-  const setTasks_ = useStore((state) => state.setTasks);
-  const setCategories_ = useStore((state) => state.setCategories);
-  const setMoods_ = useStore((state) => state.setMoods);
-  
-  // Initialize tasks with stored completion states
+  // Initialize with demo data if no categories exist yet
   useEffect(() => {
-    // Load saved tasks from localStorage
-    const savedTasks = localStorage.getItem("perfectday-tasks");
-    if (savedTasks) {
-      try {
-        // Parse the saved tasks and ensure dates are properly converted back to Date objects
-        const parsedTasks = JSON.parse(savedTasks, (key, value) => {
-          if (key === "dueDate" && value) {
-            return new Date(value);
-          }
-          return value;
-        });
-        setTasks(parsedTasks);
-      } catch (error) {
-        console.error("Error loading saved tasks:", error);
-        // Fall back to demo tasks if there's an error
-        loadDemoTasksWithCompletionState();
-      }
-    } else {
-      // No saved tasks, use demo tasks with any saved completion states
-      loadDemoTasksWithCompletionState();
+    if (categories.length === 0 && user) {
+      setCategories(demoCategories.map(cat => ({
+        ...cat,
+        id: `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      })));
     }
-  }, []);
+  }, [categories.length, setCategories, user]);
   
-  // Function to load demo tasks but apply any saved completion states
-  const loadDemoTasksWithCompletionState = () => {
-    try {
-      const completedTasks = JSON.parse(localStorage.getItem("perfectday-completed-tasks") || "{}");
-      const tasksWithCompletionState = demoTasks.map(task => ({
-        ...task,
-        completed: completedTasks[task.id] !== undefined ? completedTasks[task.id] : task.completed
-      }));
-      setTasks(tasksWithCompletionState);
-    } catch (error) {
-      console.error("Error loading completion states:", error);
-      setTasks(demoTasks);
-    }
-  };
-
-  // Sync state with Zustand store and localStorage
+  // Save user data to localStorage whenever it changes
   useEffect(() => {
-    if (tasks.length > 0) {
-      setTasks_(tasks);
-      // Save tasks to localStorage
+    if (user) {
       try {
-        localStorage.setItem("perfectday-tasks", JSON.stringify(tasks));
+        localStorage.setItem(`perfectday-tasks-${user.id}`, JSON.stringify(tasks));
+        localStorage.setItem(`perfectday-categories-${user.id}`, JSON.stringify(categories));
+        localStorage.setItem(`perfectday-moods-${user.id}`, JSON.stringify(moods));
       } catch (error) {
-        console.error("Error saving tasks:", error);
+        console.error("Error saving data:", error);
       }
     }
-  }, [tasks, setTasks_]);
-  
-  // Sync other state with Zustand store
-  useEffect(() => {
-    setCategories_(categories);
-    setMoods_(moods);
-  }, [categories, moods, setCategories_, setMoods_]);
+  }, [tasks, categories, moods, user]);
 
   // Get tasks based on active view
-  const filteredTasks = getGroupedTasks(tasks, activeView);
+  // Show all tasks on dashboard 
+  const filteredTasks = tasks;
 
   // Task handlers
   const handleTaskComplete = (id: string, completed: boolean) => {
-    setTasks(
-      tasks.map((task) => (task.id === id ? { ...task, completed } : task))
-    );
+    const taskToUpdate = tasks.find(task => task.id === id);
+    if (taskToUpdate) {
+      updateTask({
+        ...taskToUpdate,
+        completed
+      });
+    }
   };
 
   const handleTaskEdit = (task: Task) => {
@@ -180,32 +157,26 @@ export default function Dashboard() {
   };
 
   const handleTaskDelete = (id: string) => {
-    setTasks(tasks.filter((task) => task.id !== id));
-    
-    // Also remove from completed tasks in localStorage if exists
-    try {
-      const completedTasks = JSON.parse(localStorage.getItem("perfectday-completed-tasks") || "{}");
-      if (completedTasks[id]) {
-        delete completedTasks[id];
-        localStorage.setItem("perfectday-completed-tasks", JSON.stringify(completedTasks));
-      }
-    } catch (error) {
-      console.error("Error removing task from completed tasks:", error);
-    }
+    deleteTask(id);
   };
 
   const handleTaskSubmit = (data: Partial<Task>) => {
+    if (!user) return; // Safety check
+    
     if (data.id) {
       // Update existing task
-      setTasks(
-        tasks.map((task) =>
-          task.id === data.id ? { ...task, ...data } : task
-        )
-      );
+      const taskToUpdate = tasks.find(task => task.id === data.id);
+      if (taskToUpdate) {
+        updateTask({
+          ...taskToUpdate,
+          ...data,
+          updatedAt: new Date()
+        });
+      }
     } else {
       // Create new task
       const newTask: Task = {
-        id: `task-${Date.now()}`,
+        id: `task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
         title: data.title || "",
         description: data.description || null,
         dueDate: data.dueDate || null,
@@ -213,24 +184,29 @@ export default function Dashboard() {
         priority: data.priority || Priority.MEDIUM,
         createdAt: new Date(),
         updatedAt: new Date(),
-        userId: "user1",
+        userId: user.id,
         categoryId: data.categoryId || null,
         routineId: null,
       };
-      setTasks([...tasks, newTask]);
+      addTask(newTask);
     }
+    
+    setIsTaskFormOpen(false);
+    setSelectedTask(null);
   };
 
   // Mood handlers
   const handleAddMood = (value: number, note: string) => {
+    if (!user) return; // Safety check
+    
     const newMood: Mood = {
-      id: `mood-${Date.now()}`,
+      id: `mood-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       value,
       note: note || null,
       createdAt: new Date(),
-      userId: "user1",
+      userId: user.id,
     };
-    setMoods([newMood, ...moods]);
+    addMood(newMood);
   };
 
   return (
@@ -270,7 +246,10 @@ export default function Dashboard() {
         task={selectedTask}
         categories={categories}
         isOpen={isTaskFormOpen}
-        onClose={() => setIsTaskFormOpen(false)}
+        onClose={() => {
+          setIsTaskFormOpen(false);
+          setSelectedTask(null);
+        }}
         onSubmit={handleTaskSubmit}
       />
     </div>

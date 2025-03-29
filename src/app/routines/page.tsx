@@ -277,7 +277,7 @@ export default function RoutinesPage() {
         ) : (
           <div className="relative">
             {/* Timeline line */}
-            <div className="absolute left-[38px] top-8 bottom-0 w-1 bg-gray-200 dark:bg-gray-700" />
+            <div className="absolute left-[35px] top-8 bottom-0 w-1 bg-gray-200 dark:bg-gray-700" />
             
             {/* Routine cards */}
             {sortedRoutines.map((routine) => (
@@ -289,8 +289,8 @@ export default function RoutinesPage() {
                 )}
               >
                 {/* Time bubble */}
-                <div className="absolute left-[-40px] top-1/2 -translate-y-1/2 transform">
-                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-center font-mono text-lg font-bold text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
+                <div className="absolute left-[-48px] top-1/2 -translate-y-1/2 transform">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-indigo-100 text-center font-mono text-lg font-bold text-indigo-800 shadow-md dark:bg-indigo-900/30 dark:text-indigo-300 dark:shadow-indigo-900/10">
                     {routine.time ? format(routine.time, "h:mm") : "??:??"}
                     <span className="absolute bottom-1 text-xs font-normal">
                       {routine.time ? format(routine.time, "a") : ""}
