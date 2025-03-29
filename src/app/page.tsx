@@ -1,103 +1,215 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState, useEffect } from "react";
+import { Task, Category, Mood, Priority } from "@prisma/client";
+import { useStore } from "@/store/useStore";
+import { getGroupedTasks } from "@/lib/utils";
+import { TaskList } from "@/components/tasks/TaskList";
+import { TaskForm } from "@/components/tasks/TaskForm";
+import { MoodTracker } from "@/components/mood/MoodTracker";
+import { PlusIcon } from "@heroicons/react/24/outline";
+
+// Demo data for UI development
+const demoCategories: Category[] = [
+  {
+    id: "1",
+    name: "Work",
+    color: "#4F46E5",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "2",
+    name: "Personal",
+    color: "#06B6D4",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+  {
+    id: "3",
+    name: "Health",
+    color: "#10B981",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  },
+];
+
+const demoTasks: Task[] = [
+  {
+    id: "1",
+    title: "Complete project proposal",
+    description: "Finish the draft and send for review",
+    dueDate: new Date(new Date().setHours(new Date().getHours() + 3)),
+    completed: false,
+    priority: Priority.HIGH,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    userId: "user1",
+    categoryId: "1",
+    routineId: null,
+  },
+  {
+    id: "2",
+    title: "Go for a run",
+    description: "30 minutes cardio exercise",
+    dueDate: new Date(new Date().setHours(new Date().getHours() + 5)),
+    completed: false,
+    priority: Priority.MEDIUM,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    userId: "user1",
+    categoryId: "3",
+    routineId: null,
+  },
+  {
+    id: "3",
+    title: "Buy groceries",
+    description: "Get items for dinner",
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 1)),
+    completed: true,
+    priority: Priority.LOW,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    userId: "user1",
+    categoryId: "2",
+    routineId: null,
+  },
+];
+
+const demoMoods: Mood[] = [
+  {
+    id: "1",
+    value: 4,
+    note: "Feeling productive today!",
+    createdAt: new Date(new Date().setHours(new Date().getHours() - 2)),
+    userId: "user1",
+  },
+  {
+    id: "2",
+    value: 3,
+    note: "Tired but okay",
+    createdAt: new Date(new Date().setHours(new Date().getHours() - 5)),
+    userId: "user1",
+  },
+];
+
+export default function Dashboard() {
+  const [tasks, setTasks] = useState<Task[]>(demoTasks);
+  const [categories, setCategories] = useState<Category[]>(demoCategories);
+  const [moods, setMoods] = useState<Mood[]>(demoMoods);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const activeView = useStore((state) => state.activeView);
+  const setTasks_ = useStore((state) => state.setTasks);
+  const setCategories_ = useStore((state) => state.setCategories);
+  const setMoods_ = useStore((state) => state.setMoods);
+
+  // Sync state with Zustand store
+  useEffect(() => {
+    setTasks_(tasks);
+    setCategories_(categories);
+    setMoods_(moods);
+  }, [tasks, categories, moods, setTasks_, setCategories_, setMoods_]);
+
+  // Get tasks based on active view
+  const filteredTasks = getGroupedTasks(tasks, activeView);
+
+  // Task handlers
+  const handleTaskComplete = (id: string, completed: boolean) => {
+    setTasks(
+      tasks.map((task) => (task.id === id ? { ...task, completed } : task))
+    );
+  };
+
+  const handleTaskEdit = (task: Task) => {
+    setSelectedTask(task);
+    setIsTaskFormOpen(true);
+  };
+
+  const handleTaskDelete = (id: string) => {
+    setTasks(tasks.filter((task) => task.id !== id));
+  };
+
+  const handleTaskSubmit = (data: Partial<Task>) => {
+    if (data.id) {
+      // Update existing task
+      setTasks(
+        tasks.map((task) =>
+          task.id === data.id ? { ...task, ...data } : task
+        )
+      );
+    } else {
+      // Create new task
+      const newTask: Task = {
+        id: `task-${Date.now()}`,
+        title: data.title || "",
+        description: data.description || null,
+        dueDate: data.dueDate || null,
+        completed: false,
+        priority: data.priority || Priority.MEDIUM,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: "user1",
+        categoryId: data.categoryId || null,
+        routineId: null,
+      };
+      setTasks([...tasks, newTask]);
+    }
+  };
+
+  // Mood handlers
+  const handleAddMood = (value: number, note: string) => {
+    const newMood: Mood = {
+      id: `mood-${Date.now()}`,
+      value,
+      note: note || null,
+      createdAt: new Date(),
+      userId: "user1",
+    };
+    setMoods([newMood, ...moods]);
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="mx-auto max-w-7xl">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          Dashboard
+        </h1>
+        <button
+          onClick={() => {
+            setSelectedTask(null);
+            setIsTaskFormOpen(true);
+          }}
+          className="flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+        >
+          <PlusIcon className="h-5 w-5" />
+          <span>New Task</span>
+        </button>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <TaskList
+            tasks={filteredTasks}
+            categories={categories}
+            onComplete={handleTaskComplete}
+            onEdit={handleTaskEdit}
+            onDelete={handleTaskDelete}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <div>
+          <MoodTracker moods={moods} onAddMood={handleAddMood} />
+        </div>
+      </div>
+
+      <TaskForm
+        task={selectedTask}
+        categories={categories}
+        isOpen={isTaskFormOpen}
+        onClose={() => setIsTaskFormOpen(false)}
+        onSubmit={handleTaskSubmit}
+      />
     </div>
   );
 }
