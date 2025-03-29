@@ -32,6 +32,12 @@ export function ThemeProvider({
   const setThemeInStore = useStore((state) => state.setTheme);
   const storeTheme = useStore((state) => state.theme);
   const [theme, setTheme] = useState<Theme>(storeTheme || defaultTheme);
+  const [mounted, setMounted] = useState(false);
+
+  // After mounting, we can show the theme UI
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -52,11 +58,21 @@ export function ThemeProvider({
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      setThemeInStore(theme);
-      setTheme(theme);
+    setTheme: (newTheme: Theme) => {
+      setThemeInStore(newTheme);
+      setTheme(newTheme);
+      try {
+        localStorage.setItem(storageKey, newTheme);
+      } catch (e) {
+        console.error(e);
+      }
     },
   };
+
+  // Prevent flash of incorrect theme
+  if (!mounted) {
+    return <>{children}</>;
+  }
 
   return (
     <ThemeProviderContext.Provider {...props} value={value}>

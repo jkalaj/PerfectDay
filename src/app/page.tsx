@@ -94,7 +94,7 @@ const demoMoods: Mood[] = [
 ];
 
 export default function Dashboard() {
-  const [tasks, setTasks] = useState<Task[]>(demoTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [categories, setCategories] = useState<Category[]>(demoCategories);
   const [moods, setMoods] = useState<Mood[]>(demoMoods);
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
@@ -104,13 +104,65 @@ export default function Dashboard() {
   const setTasks_ = useStore((state) => state.setTasks);
   const setCategories_ = useStore((state) => state.setCategories);
   const setMoods_ = useStore((state) => state.setMoods);
-
-  // Sync state with Zustand store
+  
+  // Initialize tasks with stored completion states
   useEffect(() => {
-    setTasks_(tasks);
+    // Load saved tasks from localStorage
+    const savedTasks = localStorage.getItem("perfectday-tasks");
+    if (savedTasks) {
+      try {
+        // Parse the saved tasks and ensure dates are properly converted back to Date objects
+        const parsedTasks = JSON.parse(savedTasks, (key, value) => {
+          if (key === "dueDate" && value) {
+            return new Date(value);
+          }
+          return value;
+        });
+        setTasks(parsedTasks);
+      } catch (error) {
+        console.error("Error loading saved tasks:", error);
+        // Fall back to demo tasks if there's an error
+        loadDemoTasksWithCompletionState();
+      }
+    } else {
+      // No saved tasks, use demo tasks with any saved completion states
+      loadDemoTasksWithCompletionState();
+    }
+  }, []);
+  
+  // Function to load demo tasks but apply any saved completion states
+  const loadDemoTasksWithCompletionState = () => {
+    try {
+      const completedTasks = JSON.parse(localStorage.getItem("perfectday-completed-tasks") || "{}");
+      const tasksWithCompletionState = demoTasks.map(task => ({
+        ...task,
+        completed: completedTasks[task.id] !== undefined ? completedTasks[task.id] : task.completed
+      }));
+      setTasks(tasksWithCompletionState);
+    } catch (error) {
+      console.error("Error loading completion states:", error);
+      setTasks(demoTasks);
+    }
+  };
+
+  // Sync state with Zustand store and localStorage
+  useEffect(() => {
+    if (tasks.length > 0) {
+      setTasks_(tasks);
+      // Save tasks to localStorage
+      try {
+        localStorage.setItem("perfectday-tasks", JSON.stringify(tasks));
+      } catch (error) {
+        console.error("Error saving tasks:", error);
+      }
+    }
+  }, [tasks, setTasks_]);
+  
+  // Sync other state with Zustand store
+  useEffect(() => {
     setCategories_(categories);
     setMoods_(moods);
-  }, [tasks, categories, moods, setTasks_, setCategories_, setMoods_]);
+  }, [categories, moods, setCategories_, setMoods_]);
 
   // Get tasks based on active view
   const filteredTasks = getGroupedTasks(tasks, activeView);
@@ -129,6 +181,17 @@ export default function Dashboard() {
 
   const handleTaskDelete = (id: string) => {
     setTasks(tasks.filter((task) => task.id !== id));
+    
+    // Also remove from completed tasks in localStorage if exists
+    try {
+      const completedTasks = JSON.parse(localStorage.getItem("perfectday-completed-tasks") || "{}");
+      if (completedTasks[id]) {
+        delete completedTasks[id];
+        localStorage.setItem("perfectday-completed-tasks", JSON.stringify(completedTasks));
+      }
+    } catch (error) {
+      console.error("Error removing task from completed tasks:", error);
+    }
   };
 
   const handleTaskSubmit = (data: Partial<Task>) => {

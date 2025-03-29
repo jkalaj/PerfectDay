@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { format, isToday, isThisWeek, isThisMonth, parseISO } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, parseISO, addWeeks, addMonths } from 'date-fns';
 import { Task, Priority } from '@prisma/client';
 
 export function cn(...inputs: ClassValue[]) {
@@ -22,10 +22,24 @@ export function getGroupedTasks(tasks: Task[], view: 'today' | 'week' | 'month')
     if (!task.dueDate) return view === 'today'; // Tasks without due date go to Today
     
     const dueDate = typeof task.dueDate === 'string' ? parseISO(task.dueDate) : task.dueDate;
+    const now = new Date();
     
+    // For the "today" view, only show tasks that are due today
     if (view === 'today') return isToday(dueDate);
-    if (view === 'week') return isThisWeek(dueDate);
-    return isThisMonth(dueDate);
+    
+    // For the "week" view, show tasks that are due within the next 7 days
+    if (view === 'week') {
+      const nextWeek = addWeeks(now, 1);
+      return dueDate >= now && dueDate <= nextWeek;
+    }
+    
+    // For the "month" view, show tasks that are due within the next 30 days
+    if (view === 'month') {
+      const nextMonth = addMonths(now, 1);
+      return dueDate >= now && dueDate <= nextMonth;
+    }
+    
+    return false;
   });
 }
 

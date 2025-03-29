@@ -6,6 +6,8 @@ import { useStore } from "@/store/useStore";
 import { Bars3Icon, PlusIcon, BellIcon } from "@heroicons/react/24/outline";
 import { Popover, Transition, Tab } from "@headlessui/react";
 import { Fragment, useState } from "react";
+import { TaskForm } from "@/components/tasks/TaskForm";
+import { Task, Priority } from "@prisma/client";
 
 interface TopBarProps {
   onMenuClick: () => void;
@@ -14,12 +16,35 @@ interface TopBarProps {
 export function TopBar({ onMenuClick }: TopBarProps) {
   const activeView = useStore((state) => state.activeView);
   const setActiveView = useStore((state) => state.setActiveView);
+  const tasks = useStore((state) => state.tasks);
+  const categories = useStore((state) => state.categories);
+  const setTasks = useStore((state) => state.setTasks);
+  
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
 
   const views = [
     { id: "today", name: "Today" },
     { id: "week", name: "Week" },
     { id: "month", name: "Month" },
   ];
+  
+  const handleTaskSubmit = (data: Partial<Task>) => {
+    // Create new task
+    const newTask: Task = {
+      id: `task-${Date.now()}`,
+      title: data.title || "",
+      description: data.description || null,
+      dueDate: data.dueDate || null,
+      completed: false,
+      priority: data.priority || Priority.MEDIUM,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      userId: "user1",
+      categoryId: data.categoryId || null,
+      routineId: null,
+    };
+    setTasks([...tasks, newTask]);
+  };
 
   return (
     <header className="border-b border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
@@ -53,6 +78,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         <div className="flex items-center space-x-2">
           <button
             type="button"
+            onClick={() => setIsTaskFormOpen(true)}
             className="rounded-full bg-indigo-600 p-2 text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-indigo-500 dark:hover:bg-indigo-600"
           >
             <PlusIcon className="h-5 w-5" aria-hidden="true" />
@@ -62,6 +88,14 @@ export function TopBar({ onMenuClick }: TopBarProps) {
           <ThemeToggle />
         </div>
       </div>
+      
+      <TaskForm
+        task={null}
+        categories={categories}
+        isOpen={isTaskFormOpen}
+        onClose={() => setIsTaskFormOpen(false)}
+        onSubmit={handleTaskSubmit}
+      />
     </header>
   );
 }
